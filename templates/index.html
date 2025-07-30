@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8-Relay Control Panel</title>
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234CAF50'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z'/></svg>">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+            border: 1px solid #333;
+        }
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 30px;
+        }
+        h2 {
+            text-align: center;
+            color: #f0f0f0;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .relay-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .audio-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .relay-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px; /* Adjusted height */
+        }
+        .audio-button {
+            background-color: #9c27b0;
+            color: white;
+            border: none;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px; /* Adjusted height */
+        }
+        .relay-button .relay-name, .audio-button .audio-name {
+            font-size: 18px;
+        }
+        .relay-button:hover {
+            background-color: #5cb85c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        .audio-button:hover {
+            background-color: #ba68c8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        .relay-button:active, .audio-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        }
+        .relay-button.active {
+            background-color: #ff9800;
+            animation: pulse 0.5s infinite alternate;
+        }
+        .audio-button.playing {
+            background-color: #e91e63;
+            animation: pulse 0.5s infinite alternate;
+        }
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.7; }
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            display: none;
+        }
+        .status.success {
+            background-color: #1a3c1e;
+            color: #a7eeb5;
+            border: 1px solid #2a6835;
+            display: block;
+        }
+        .status.error {
+            background-color: #4d1c1c;
+            color: #f8baba;
+            border: 1px solid #8b3232;
+            display: block;
+        }
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.7);
+        }
+        .status-indicator.error {
+            background-color: #f44336;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.7);
+        }
+        .connection-status {
+            text-align: center;
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 15px;
+        }
+        .connection-status.connected {
+            color: #4CAF50;
+        }
+        .connection-status.disconnected {
+            color: #f44336;
+        }
+        .admin-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .admin-link a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .admin-link a:hover {
+            text-decoration: underline;
+        }
+        .audio-section {
+            display: none;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #444;
+        }
+        .audio-section.enabled {
+            display: block;
+        }
+        @media (max-width: 600px) {
+            .relay-grid, .audio-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-indicator" id="systemStatus"></div>
+        <h1>Relay Control Panel</h1>
+        <div class="connection-status" id="connectionStatus">Checking connection...</div>
+        <div class="relay-grid">
+            {% for relay_num, info in relay_info.items() %}
+            <button class="relay-button" onclick="triggerRelay({{ relay_num }})" data-relay="{{ relay_num }}">
+                <span class="relay-name">{{ info.name }}</span>
+            </button>
+            {% endfor %}
+        </div>
+        
+        <div class="audio-section" id="audioSection">
+            <h2>Audio Controls</h2>
+            <div class="audio-grid" id="audioGrid">
+                </div>
+        </div>
+        
+        <div id="status" class="status"></div>
+        <div class="admin-link">
+            <a href="/admin">Admin Dashboard</a>
+        </div>
+    </div>
+    <script>
+        let isConnected = true;
+        let activeRelays = new Set();
+        let relayNames = {};
+        let audioButtons = {};
+        let audioEnabled = false;
+
+        // Check system status and update relay names
+        function checkStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('connectionStatus').textContent = 'Connected';
+                    document.getElementById('connectionStatus').className = 'connection-status connected';
+                    document.getElementById('systemStatus').className = 'status-indicator';
+                    isConnected = true;
+                    
+                    // Update relay names from status
+                    if (data.relays) {
+                        Object.keys(data.relays).forEach(relayNum => {
+                            relayNames[relayNum] = data.relays[relayNum].name;
+                        });
+                    }
+                    
+                    // Update audio button status
+                    if (data.system.audio_enabled && data.audio_buttons) {
+                        audioEnabled = true;
+                        audioButtons = data.audio_buttons;
+                        updateAudioButtons();
+                    } else {
+                        audioEnabled = false;
+                        document.getElementById('audioSection').classList.remove('enabled');
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('connectionStatus').textContent = 'Disconnected';
+                    document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                    document.getElementById('systemStatus').className = 'status-indicator error';
+                    isConnected = false;
+                });
+        }
+
+        function updateAudioButtons() {
+            const audioSection = document.getElementById('audioSection');
+            const audioGrid = document.getElementById('audioGrid');
+            
+            if (audioEnabled && audioButtons) {
+                audioSection.classList.add('enabled');
+                audioGrid.innerHTML = '';
+                
+                if (audioButtons.button1 && audioButtons.button1.pin) {
+                    const btn1 = createAudioButton(1, audioButtons.button1);
+                    audioGrid.appendChild(btn1);
+                }
+                
+                if (audioButtons.button2 && audioButtons.button2.pin) {
+                    const btn2 = createAudioButton(2, audioButtons.button2);
+                    audioGrid.appendChild(btn2);
+                }
+            }
+        }
+
+        function createAudioButton(num, config) {
+            const button = document.createElement('button');
+            button.className = 'audio-button';
+            button.onclick = () => playAudio(num);
+            button.innerHTML = `
+                <span class="audio-name">${config.name || 'Audio ' + num}</span>
+            `;
+            return button;
+        }
+
+        // Check status every 5 seconds
+        setInterval(checkStatus, 5000);
+        checkStatus();
+
+        function triggerRelay(relayNum) {
+            if (!isConnected) {
+                showStatus('Connection lost. Please check the system.', 'error');
+                return;
+            }
+
+            if (activeRelays.has(relayNum)) {
+                showStatus(`${relayNames[relayNum] || 'Relay ' + relayNum} is already active`, 'error');
+                return;
+            }
+
+            const button = event.target.closest('.relay-button');
+            const statusDiv = document.getElementById('status');
+            const relayName = relayNames[relayNum] || `Relay ${relayNum}`;
+
+            // Add to active relays
+            activeRelays.add(relayNum);
+
+            // Disable button and add active class
+            button.disabled = true;
+            button.classList.add('active');
+            const nameSpan = button.querySelector('.relay-name');
+            const originalName = nameSpan.textContent;
+            nameSpan.textContent = `${originalName} ON`;
+
+            // Send request to Flask backend
+            fetch(`/relay/${relayNum}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    showStatus(`${relayName} triggered for ${data.duration} seconds`, 'success');
+
+                    // Reset button after duration
+                    setTimeout(() => {
+                        button.disabled = false;
+                        button.classList.remove('active');
+                        nameSpan.textContent = originalName;
+                        activeRelays.delete(relayNum);
+                    }, data.duration * 1000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showStatus(error.message || `Failed to trigger ${relayName}`, 'error');
+                button.disabled = false;
+                button.classList.remove('active');
+                nameSpan.textContent = originalName;
+                activeRelays.delete(relayNum);
+            });
+        }
+
+        function playAudio(buttonNum) {
+            if (!isConnected) {
+                showStatus('Connection lost. Please check the system.', 'error');
+                return;
+            }
+
+            const button = event.target.closest('.audio-button');
+            const audioName = audioButtons[`button${buttonNum}`]?.name || `Audio ${buttonNum}`;
+
+            // Disable button and add playing class
+            button.disabled = true;
+            button.classList.add('playing');
+
+            // Send request to Flask backend
+            fetch(`/audio/play/${buttonNum}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    showStatus(data.message, 'success');
+                }
+                // Reset button after a short delay
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.classList.remove('playing');
+                }, 2000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showStatus(error.message || `Failed to play ${audioName}`, 'error');
+                button.disabled = false;
+                button.classList.remove('playing');
+            });
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
