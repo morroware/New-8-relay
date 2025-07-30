@@ -1,26 +1,25 @@
 [Unit]
-Description=Relay Control Web Service
+Description=8-Relay Control Web Service
 After=network.target
-Wants=network-online.target
 
 [Service]
 Type=simple
 User=tech
 Group=gpio
-# Corrected paths below
 WorkingDirectory=/home/tech/8-relay
-ExecStart=/home/tech/8-relay/venv/bin/gunicorn --workers 3 --bind unix:relay_control.sock -m 007 app:app
-
+# The ExecStart line now uses gunicorn for a more robust production server
+ExecStart=/home/tech/8-relay/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
 Restart=always
 RestartSec=10
 
-# Security settings
+# Security settings from the more robust service file
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
+# Grant write access to necessary directories
 ReadWritePaths=/var/log/relay_control /home/tech/8-relay
 
-# Resource limits
+# Resource limits from the more robust service file
 CPUQuota=50%
 MemoryLimit=256M
 
@@ -28,6 +27,9 @@ MemoryLimit=256M
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=relay-control
+
+# Audio permissions
+SupplementaryGroups=audio
 
 [Install]
 WantedBy=multi-user.target
