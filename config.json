@@ -10,19 +10,19 @@
         "8": 4
     },
     "relay_names": {
-        "1": "Relay 1",
-        "2": "Relay 2",
-        "3": "Relay 3",
-        "4": "Relay 4",
-        "5": "Relay 5",
-        "6": "Relay 6",
-        "7": "Relay 7",
-        "8": "Relay 8"
+        "1": "Main Light",
+        "2": "Accent Light",
+        "3": "Fan",
+        "4": "Outlet 1",
+        "5": "Outlet 2",
+        "6": "Device 1",
+        "7": "Device 2",
+        "8": "Spare"
     },
     "relay_settings": {
         "active_low": true,
         "trigger_durations": {
-            "1": 180,
+            "1": 0.5,
             "2": 0.5,
             "3": 0.5,
             "4": 0.5,
@@ -34,9 +34,25 @@
         "max_concurrent_triggers": 3
     },
     "button_settings": {
-        "enabled": true,
+        "enabled": false,
         "button_pin": 26,
         "relay_number": 1,
+        "pull_up": true,
+        "debounce_time": 0.3,
+        "poll_interval": 0.01
+    },
+    "multi_button_settings": {
+        "enabled": true,
+        "buttons": {
+            "1": {"pin": 26, "relay": 1, "enabled": true},
+            "2": {"pin": 5, "relay": 2, "enabled": true},
+            "3": {"pin": 6, "relay": 3, "enabled": true},
+            "4": {"pin": 12, "relay": 4, "enabled": true},
+            "5": {"pin": 20, "relay": 5, "enabled": true},
+            "6": {"pin": 21, "relay": 6, "enabled": true},
+            "7": {"pin": 7, "relay": 7, "enabled": true},
+            "8": {"pin": 8, "relay": 8, "enabled": true}
+        },
         "pull_up": true,
         "debounce_time": 0.3,
         "poll_interval": 0.01
@@ -52,17 +68,17 @@
         "enabled": true,
         "button1": {
             "pin": 13,
-            "audio_file": "/home/tech/8-relay/audio/sound1.mp3",
-            "name": "Sound 1",
-            "volume": 40,
+            "audio_file": "/home/tech/8-relay/audio/doorbell.mp3",
+            "name": "Doorbell",
+            "volume": 70,
             "pull_up": true,
             "debounce_time": 0.3
         },
         "button2": {
             "pin": 19,
-            "audio_file": "/home/tech/8-relay/audio/sound2.mp3",
-            "name": "Sound 2",
-            "volume": 40,
+            "audio_file": "/home/tech/8-relay/audio/notification.mp3",
+            "name": "Notification",
+            "volume": 60,
             "pull_up": true,
             "debounce_time": 0.3
         }
@@ -77,6 +93,6 @@
         "log_file": "relay_control.log",
         "max_size_mb": 10,
         "backup_count": 5,
-        "log_level": "DEBUG"
+        "log_level": "INFO"
     }
 }
