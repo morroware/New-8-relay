@@ -8,7 +8,7 @@
 
 **Author:** Seth Morrow  
 **Version:** 2.0.0  
-**Last Updated:** January 2025
+**Last Updated:** July 2025
 
 ---
 
