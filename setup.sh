@@ -207,25 +207,37 @@ chmod 644 ${AUDIO_DIR}/*
 echo -e "${GREEN}✓ Sample audio files created in ${AUDIO_DIR}${NC}"
 
 print_step "Step 9: Creating systemd service..."
+# This section is updated to use the gunicorn-based service file.
 cat > $SERVICE_FILE <<EOF
 [Unit]
-Description=8-Relay Control Service with Audio Support
-After=network.target sound.target
+Description=8-Relay Control Web Service
+After=network.target
 
 [Service]
 Type=simple
 User=${USERNAME}
-Group=${USERNAME}
+Group=gpio
 WorkingDirectory=${APP_DIR}
-Environment="PATH=${APP_DIR}/venv/bin"
-Environment="PULSE_RUNTIME_PATH=/run/user/$(id -u ${USERNAME})/pulse"
-ExecStart=${APP_DIR}/venv/bin/python ${APP_DIR}/app.py
+# The ExecStart line now uses gunicorn for a more robust production server
+ExecStart=${APP_DIR}/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
 Restart=always
 RestartSec=10
+
+# Security settings from the more robust service file
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# Grant write access to necessary directories
+ReadWritePaths=/var/log/relay_control ${APP_DIR}
+
+# Resource limits from the more robust service file
+CPUQuota=50%
+MemoryLimit=256M
 
 # Logging
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=relay-control
 
 # Audio permissions
 SupplementaryGroups=audio
