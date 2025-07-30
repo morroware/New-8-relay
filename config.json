@@ -81,6 +81,46 @@
             "volume": 60,
             "pull_up": true,
             "debounce_time": 0.3
+        },
+        "button3": {
+            "pin": 9,
+            "audio_file": "/home/tech/8-relay/audio/chime.mp3",
+            "name": "Chime",
+            "volume": 65,
+            "pull_up": true,
+            "debounce_time": 0.3
+        },
+        "button4": {
+            "pin": 10,
+            "audio_file": "/home/tech/8-relay/audio/alert.mp3",
+            "name": "Alert",
+            "volume": 75,
+            "pull_up": true,
+            "debounce_time": 0.3
+        },
+        "button5": {
+            "pin": 11,
+            "audio_file": "/home/tech/8-relay/audio/melody.mp3",
+            "name": "Melody",
+            "volume": 60,
+            "pull_up": true,
+            "debounce_time": 0.3
+        },
+        "button6": {
+            "pin": 2,
+            "audio_file": "/home/tech/8-relay/audio/warning.mp3",
+            "name": "Warning",
+            "volume": 80,
+            "pull_up": false,
+            "debounce_time": 0.3
+        },
+        "button7": {
+            "pin": 3,
+            "audio_file": "/home/tech/8-relay/audio/success.mp3",
+            "name": "Success",
+            "volume": 70,
+            "pull_up": false,
+            "debounce_time": 0.3
         }
     },
     "server": {
