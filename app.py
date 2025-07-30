@@ -55,25 +55,98 @@ class Config:
         "reset_button": {
             "enabled": False,
             "pin": 16,
+            "pull_up": True,#!/usr/bin/env python3
+"""
+Production-ready Flask application for controlling an 8-relay module on Raspberry Pi
+Each relay can be triggered for a configurable duration via web interface
+Now includes physical button support for all 8 relays with hardware control and audio playback buttons
+Enhanced with improved GPIO cleanup and audio file validation
+"""
+
+import os
+import sys
+import logging
+from logging.handlers import RotatingFileHandler
+from flask import Flask, render_template, jsonify, request
+import RPi.GPIO as GPIO
+import time
+import threading
+import signal
+import atexit
+from datetime import datetime
+import json
+from pathlib import Path
+import subprocess
+import pygame
+
+# Configuration
+class Config:
+    """Configuration management with JSON file support"""
+
+    # Default configuration
+    _defaults = {
+        "relay_pins": {
+            "1": 17, "2": 18, "3": 27, "4": 22,
+            "5": 23, "6": 24, "7": 25, "8": 4
+        },
+        "relay_names": {
+            "1": "Relay 1", "2": "Relay 2", "3": "Relay 3", "4": "Relay 4",
+            "5": "Relay 5", "6": "Relay 6", "7": "Relay 7", "8": "Relay 8"
+        },
+        "relay_settings": {
+            "active_low": True,
+            "trigger_durations": {
+                "1": 0.5, "2": 0.5, "3": 0.5, "4": 0.5,
+                "5": 0.5, "6": 0.5, "7": 0.5, "8": 0.5
+            },
+            "max_concurrent_triggers": 3
+        },
+        "button_settings": {
+            "enabled": True,
+            "button_pin": 26,  # Legacy single button support
+            "relay_number": 1,
+            "pull_up": True,
+            "debounce_time": 0.3,
+            "poll_interval": 0.01
+        },
+        "multi_button_settings": {
+            "enabled": True,
+            "buttons": {
+                "1": {"pin": 26, "relay": 1, "enabled": True},
+                "2": {"pin": 5, "relay": 2, "enabled": True},
+                "3": {"pin": 6, "relay": 3, "enabled": True},
+                "4": {"pin": 12, "relay": 4, "enabled": True},
+                "5": {"pin": 20, "relay": 5, "enabled": True},
+                "6": {"pin": 21, "relay": 6, "enabled": True},
+                "7": {"pin": 7, "relay": 7, "enabled": True},
+                "8": {"pin": 8, "relay": 8, "enabled": True}
+            },
+            "pull_up": True,
+            "debounce_time": 0.3,
+            "poll_interval": 0.01
+        },
+        "reset_button": {
+            "enabled": True,
+            "pin": 16,
             "pull_up": True,
             "debounce_time": 0.3,
             "poll_interval": 0.01
         },
         "audio_buttons": {
-            "enabled": False,
+            "enabled": True,
             "button1": {
-                "pin": 5,
-                "audio_file": "/home/pi/audio/sound1.mp3",
+                "pin": 13,
+                "audio_file": "/home/tech/8-relay/audio/sound1.mp3",
                 "name": "Sound 1",
-                "volume": 80,
+                "volume": 40,
                 "pull_up": True,
                 "debounce_time": 0.3
             },
             "button2": {
-                "pin": 6,
-                "audio_file": "/home/pi/audio/sound2.mp3",
+                "pin": 19,
+                "audio_file": "/home/tech/8-relay/audio/sound2.mp3",
                 "name": "Sound 2",
-                "volume": 80,
+                "volume": 40,
                 "pull_up": True,
                 "debounce_time": 0.3
             }
@@ -96,6 +169,21 @@ class Config:
         """Load configuration from file or use defaults"""
         self.config_file = config_file
         self.config = self._load_config()
+        self._migrate_config()
+
+    def _migrate_config(self):
+        """Migrate old config format to new format"""
+        # If multi_button_settings doesn't exist but button_settings does, create it
+        if "multi_button_settings" not in self.config and "button_settings" in self.config:
+            # Create multi_button_settings with button 1 from old settings
+            self.config["multi_button_settings"] = self._defaults["multi_button_settings"].copy()
+            if self.config["button_settings"]["enabled"]:
+                self.config["multi_button_settings"]["buttons"]["1"] = {
+                    "pin": self.config["button_settings"]["button_pin"],
+                    "relay": self.config["button_settings"]["relay_number"],
+                    "enabled": True
+                }
+            self.save_config()
 
     def _load_config(self):
         """Load configuration from JSON file"""
@@ -166,7 +254,18 @@ class Config:
         return self.config["relay_settings"]["max_concurrent_triggers"]
 
     @property
+    def MULTI_BUTTON_ENABLED(self):
+        return self.config.get("multi_button_settings", {}).get("enabled", False)
+
+    @property
+    def MULTI_BUTTON_CONFIG(self):
+        return self.config.get("multi_button_settings", {})
+
+    @property
     def BUTTON_ENABLED(self):
+        # Legacy support - if multi-button is enabled, single button is handled there
+        if self.MULTI_BUTTON_ENABLED:
+            return False
         return self.config.get("button_settings", {}).get("enabled", False)
 
     @property
@@ -483,7 +582,7 @@ class ButtonHandler:
             self.polling_thread = threading.Thread(target=self._poll_button, daemon=True)
             self.polling_thread.start()
             self.initialized = True
-            app.logger.info(f"Button polling started on GPIO {self.button_pin} (polling mode)")
+            app.logger.info(f"Button polling started on GPIO {self.button_pin} for Relay {self.relay_number}")
         except Exception as e:
             app.logger.error(f"Button setup failed: {e}")
             raise
@@ -509,6 +608,9 @@ class ButtonHandler:
                             daemon=True
                         )
                         t.start()
+                        # Update button press stats
+                        with stats_lock:
+                            stats['button_presses'][self.relay_number] = stats['button_presses'].get(self.relay_number, 0) + 1
                 self.last_state = current_state
             except Exception as e:
                 app.logger.error(f"Error in button polling: {e}")
@@ -522,7 +624,7 @@ class ButtonHandler:
         if self.polling_thread and self.polling_thread.is_alive():
             self.polling_thread.join(timeout=1)
         self.initialized = False
-        app.logger.info("Button polling stopped")
+        app.logger.info(f"Button polling stopped for GPIO {self.button_pin}")
 
 
 # Reset Button Handler Class
@@ -598,7 +700,8 @@ active_triggers = 0
 active_triggers_lock = threading.Lock()
 relay_reset_events = {i: threading.Event() for i in range(1, 9)}
 cleanup_done = False
-button_handler = None
+button_handler = None  # Legacy single button
+button_handlers = {}  # Dictionary for multi-button handlers
 reset_button_handler = None
 audio_player = None
 audio_button1_handler = None
@@ -611,6 +714,7 @@ stats = {
     'start_time': datetime.now(),
     'total_triggers': 0,
     'relay_triggers': {i: 0 for i in range(1, 9)},
+    'button_presses': {i: 0 for i in range(1, 9)},
     'last_trigger_time': None,
     'audio_plays': 0,
     'errors': 0
@@ -651,7 +755,7 @@ def setup_logging():
 
 def setup_gpio():
     """Initialize GPIO pins for relay control and buttons with improved error handling"""
-    global button_handler, reset_button_handler, audio_player, audio_button1_handler, audio_button2_handler, initialized_pins
+    global button_handler, button_handlers, reset_button_handler, audio_player, audio_button1_handler, audio_button2_handler, initialized_pins
     
     # Track what we've initialized for cleanup on error
     initialized_pins = []
@@ -674,8 +778,37 @@ def setup_gpio():
                 app.logger.error(f"Failed to setup relay {relay_num} on GPIO {pin}: {e}")
                 raise
 
-        # Setup physical relay button
-        if config.BUTTON_ENABLED:
+        # Setup physical relay buttons
+        if config.MULTI_BUTTON_ENABLED:
+            # Setup multiple buttons
+            multi_config = config.MULTI_BUTTON_CONFIG
+            buttons_config = multi_config.get('buttons', {})
+            
+            for button_id, button_cfg in buttons_config.items():
+                if button_cfg.get('enabled', True):
+                    try:
+                        button_pin = button_cfg.get('pin')
+                        relay_num = button_cfg.get('relay')
+                        
+                        if button_pin and relay_num:
+                            handler = ButtonHandler(
+                                button_pin=button_pin,
+                                relay_trigger_function=trigger_relay,
+                                relay_number=relay_num,
+                                debounce_time=multi_config.get('debounce_time', 0.3),
+                                pull_up=multi_config.get('pull_up', True),
+                                poll_interval=multi_config.get('poll_interval', 0.01)
+                            )
+                            handler.setup()
+                            button_handlers[int(button_id)] = handler
+                            initialized_pins.append(button_pin)
+                            initialized_handlers.append(handler)
+                            app.logger.info(f"Button {button_id} initialized on GPIO {button_pin} for Relay {relay_num}")
+                    except Exception as e:
+                        app.logger.error(f"Failed to setup button {button_id}: {e}")
+                        # Continue with other buttons if one fails
+        elif config.BUTTON_ENABLED:
+            # Legacy single button support
             try:
                 button_handler = ButtonHandler(
                     button_pin=config.BUTTON_PIN,
@@ -948,13 +1081,14 @@ def get_status():
                 'active_triggers': active_triggers,
                 'max_concurrent': config.MAX_CONCURRENT_TRIGGERS,
                 'timestamp': datetime.now().isoformat(),
-                'button_enabled': config.BUTTON_ENABLED,
-                'button_pin': config.BUTTON_PIN if config.BUTTON_ENABLED else None,
-                'button_relay': config.BUTTON_RELAY if config.BUTTON_ENABLED else None,
+                'button_enabled': config.BUTTON_ENABLED or config.MULTI_BUTTON_ENABLED,
+                'multi_button_enabled': config.MULTI_BUTTON_ENABLED,
+                'button_count': len(button_handlers) if config.MULTI_BUTTON_ENABLED else (1 if config.BUTTON_ENABLED else 0),
                 'audio_enabled': config.AUDIO_BUTTONS_ENABLED,
                 'audio_system_ready': audio_player.initialized if audio_player else False
             },
-            'audio_buttons': {}
+            'audio_buttons': {},
+            'physical_buttons': {}
         }
         
         # Relay status
@@ -966,7 +1100,8 @@ def get_status():
                     'name': config.RELAY_NAMES.get(relay_num, f'Relay {relay_num}'),
                     'state': 'ON' if is_on else 'OFF',
                     'locked': relay_locks[relay_num].locked(),
-                    'gpio_pin': pin
+                    'gpio_pin': pin,
+                    'button_presses': stats['button_presses'].get(relay_num, 0)
                 }
             except Exception as e:
                 app.logger.error(f"Error reading relay {relay_num} status: {e}")
@@ -977,6 +1112,18 @@ def get_status():
                     'gpio_pin': pin,
                     'error': str(e)
                 }
+        
+        # Physical button status
+        if config.MULTI_BUTTON_ENABLED:
+            buttons_config = config.MULTI_BUTTON_CONFIG.get('buttons', {})
+            for button_id, button_cfg in buttons_config.items():
+                if button_cfg.get('enabled', True):
+                    status['physical_buttons'][button_id] = {
+                        'pin': button_cfg.get('pin'),
+                        'relay': button_cfg.get('relay'),
+                        'enabled': True,
+                        'active': button_id in button_handlers and button_handlers[int(button_id)].initialized
+                    }
         
         # Audio button status with validation
         if config.AUDIO_BUTTONS_ENABLED:
@@ -1040,11 +1187,13 @@ def admin_stats():
         'uptime': str(uptime).split('.')[0],
         'total_triggers': stats['total_triggers'],
         'relay_triggers': stats['relay_triggers'],
+        'button_presses': stats['button_presses'],
         'last_trigger': stats['last_trigger_time'].isoformat() if stats['last_trigger_time'] else None,
         'audio_plays': stats['audio_plays'],
         'errors': stats['errors'],
         'active_triggers': active_triggers,
-        'gpio_pins_initialized': len(initialized_pins)
+        'gpio_pins_initialized': len(initialized_pins),
+        'physical_buttons_active': len(button_handlers) if config.MULTI_BUTTON_ENABLED else (1 if button_handler else 0)
     })
 
 
@@ -1149,7 +1298,7 @@ def internal_error(error):
 
 def cleanup_gpio():
     """Clean up GPIO resources with improved error handling"""
-    global cleanup_done, button_handler, reset_button_handler, audio_player, audio_button1_handler, audio_button2_handler
+    global cleanup_done, button_handler, button_handlers, reset_button_handler, audio_player, audio_button1_handler, audio_button2_handler
     
     if cleanup_done:
         return
@@ -1167,6 +1316,14 @@ def cleanup_gpio():
                 app.logger.info("Button handler cleanup completed")
             except Exception as e:
                 cleanup_errors.append(f"Button handler cleanup error: {e}")
+        
+        # Clean up multi-button handlers
+        for button_id, handler in button_handlers.items():
+            try:
+                handler.cleanup()
+                app.logger.info(f"Button {button_id} handler cleanup completed")
+            except Exception as e:
+                cleanup_errors.append(f"Button {button_id} handler cleanup error: {e}")
         
         if reset_button_handler:
             try:
@@ -1241,7 +1398,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 def main():
     """Main entry point with improved error handling"""
     setup_logging()
-    app.logger.info("Starting Relay Control Application with Audio Support")
+    app.logger.info("Starting Relay Control Application with Multi-Button Support")
     app.logger.info(f"Configuration loaded from: {config.config_file}")
     
     # Initialize GPIO
@@ -1252,7 +1409,9 @@ def main():
     
     # Log configuration summary
     app.logger.info(f"Relay pins configured: {list(config.RELAY_PINS.values())}")
-    app.logger.info(f"Button enabled: {config.BUTTON_ENABLED}")
+    app.logger.info(f"Multi-button enabled: {config.MULTI_BUTTON_ENABLED}")
+    if config.MULTI_BUTTON_ENABLED:
+        app.logger.info(f"Physical buttons configured: {len(button_handlers)}")
     app.logger.info(f"Audio buttons enabled: {config.AUDIO_BUTTONS_ENABLED}")
     
     try:
