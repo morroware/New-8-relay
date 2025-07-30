@@ -11,7 +11,7 @@
             background-color: #121212;
             color: #e0e0e0;
             margin: 0;
-            padding: 10px; /* Reduced padding for small screens */
+            padding: 10px;
             line-height: 1.6;
         }
         .container {
@@ -47,7 +47,7 @@
             border: 1px solid #444;
         }
 
-        /* --- Responsive Stats Grid (Already good!) --- */
+        /* --- Responsive Stats Grid --- */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -71,18 +71,18 @@
         }
 
         /* --- Mobile-First Config Layout --- */
-        .relay-config, .audio-config {
+        .relay-config, .audio-config, .button-config {
             display: flex;
-            flex-direction: column; /* Stack vertically by default */
+            flex-direction: column;
             gap: 8px;
             margin: 15px 0;
             padding-bottom: 15px;
             border-bottom: 1px solid #444;
         }
-        .relay-config:last-of-type, .audio-config:last-of-type {
+        .relay-config:last-of-type, .audio-config:last-of-type, .button-config:last-of-type {
             border-bottom: none;
         }
-        .relay-config label, .audio-config label {
+        .relay-config label, .audio-config label, .button-config label {
             font-weight: bold;
             color: #e0e0e0;
         }
@@ -92,7 +92,41 @@
             align-items: center;
         }
         .config-row input {
-            flex-grow: 1; /* Input takes available space */
+            flex-grow: 1;
+        }
+        
+        /* Multi-button grid */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .button-card {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #555;
+        }
+        .button-card.disabled {
+            opacity: 0.6;
+            border-color: #444;
+        }
+        .button-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .button-card-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .button-enable-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         /* Inputs and Buttons */
@@ -114,7 +148,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
-            width: 100%; /* Full width for mobile */
+            width: 100%;
             margin-top: 10px;
         }
         button:hover {
@@ -123,7 +157,7 @@
         button.test, button.audio-test {
             padding: 10px 15px;
             font-size: 14px;
-            width: auto; /* Allow test buttons to be smaller */
+            width: auto;
             margin-top: 0;
         }
         button.test { background-color: #2196F3; }
@@ -173,6 +207,14 @@
         .file-path-input {
             font-family: monospace; font-size: 12px;
         }
+        .button-info {
+            font-size: 14px;
+            color: #bbb;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #2a2a2a;
+            border-radius: 4px;
+        }
 
         /* --- Desktop Layout (Tablet and up) --- */
         @media (min-width: 768px) {
@@ -185,24 +227,47 @@
             h1 { font-size: 32px; }
             h2 { font-size: 24px; }
 
-            /* Revert to grid layout for config sections on larger screens */
+            /* Grid layout for config sections on larger screens */
             .relay-config, .audio-config {
                 display: grid;
-                grid-template-columns: 150px 1fr auto; /* Label, Input, Suffix/Button */
+                grid-template-columns: 150px 1fr auto;
                 gap: 15px;
                 align-items: center;
                 margin: 10px 0;
-                border-bottom: none; /* Remove bottom border on desktop */
+                border-bottom: none;
                 padding-bottom: 0;
             }
             .relay-config label, .audio-config label {
                 text-align: right;
             }
-            .config-row { /* No longer needed for grid */
+            .config-row {
                 display: contents; 
             }
             button {
-                width: auto; /* Auto width for buttons on desktop */
+                width: auto;
+            }
+            
+            /* Multi-button grid on larger screens */
+            .button-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .button-config {
+                display: grid;
+                grid-template-columns: 120px 1fr;
+                gap: 15px;
+                align-items: center;
+                padding-bottom: 10px;
+                border-bottom: none;
+            }
+            .button-config label {
+                text-align: right;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .button-grid {
+                grid-template-columns: repeat(4, 1fr);
             }
         }
     </style>
@@ -233,8 +298,8 @@
                     <div class="stat-label">Errors</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="buttonStatusValue">{{ "Yes" if config.button_settings.enabled else "No" }}</div>
-                    <div class="stat-label">Button Enabled</div>
+                    <div class="stat-value" id="buttonCountValue">0</div>
+                    <div class="stat-label">Active Buttons</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="audioStatusValue">{{ "Yes" if config.audio_buttons.enabled else "No" }}</div>
@@ -270,30 +335,95 @@
             </div>
             <div id="configStatus"></div>
         </div>
+        
         <div class="section">
-            <h2>Button Settings</h2>
+            <h2>Physical Button Configuration</h2>
             <div class="checkbox-label">
-                <input type="checkbox" id="buttonEnabled"
-                       {% if config.button_settings.enabled %}checked{% endif %}>
-                <label for="buttonEnabled">Enable Physical Button</label>
+                <input type="checkbox" id="multiButtonEnabled"
+                       {% if config.get('multi_button_settings', {}).get('enabled', False) %}checked{% endif %}>
+                <label for="multiButtonEnabled">Enable Individual Buttons for Each Relay</label>
             </div>
-            <div class="relay-config">
-                <label for="buttonPin">Button GPIO Pin:</label>
-                <input type="number" id="buttonPin" value="{{ config.button_settings.button_pin }}">
-                <span></span>
+            
+            <div id="multiButtonConfig" style="display: {% if config.get('multi_button_settings', {}).get('enabled', False) %}block{% else %}none{% endif %};">
+                <div class="button-info">
+                    Configure GPIO pins for physical buttons. Each button will trigger its corresponding relay.
+                    All buttons share common ground connections. Recommended available pins: 5, 6, 7, 8, 12, 20, 21, 26.
+                </div>
+                
+                <div class="button-grid">
+                    {% for button_num in range(1, 9) %}
+                    {% set button_config = config.get('multi_button_settings', {}).get('buttons', {}).get(button_num|string, {}) %}
+                    <div class="button-card" id="buttonCard{{ button_num }}">
+                        <div class="button-card-header">
+                            <div class="button-card-title">Button {{ button_num }}</div>
+                            <div class="button-enable-checkbox">
+                                <input type="checkbox" id="buttonEnabled{{ button_num }}"
+                                       {% if button_config.get('enabled', True) %}checked{% endif %}>
+                                <label for="buttonEnabled{{ button_num }}">Enable</label>
+                            </div>
+                        </div>
+                        <div class="button-config">
+                            <label for="buttonPin{{ button_num }}">GPIO Pin:</label>
+                            <input type="number" id="buttonPin{{ button_num }}" 
+                                   value="{{ button_config.get('pin', '') }}"
+                                   placeholder="GPIO pin">
+                        </div>
+                        <div class="button-config">
+                            <label for="buttonRelay{{ button_num }}">Controls:</label>
+                            <input type="text" id="buttonRelayName{{ button_num }}" 
+                                   value="Relay {{ button_config.get('relay', button_num) }}"
+                                   disabled style="background-color: #2a2a2a;">
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <h3>Global Button Settings</h3>
+                <div class="button-config">
+                    <label for="globalDebounce">Debounce Time:</label>
+                    <input type="number" id="globalDebounce" 
+                           value="{{ config.get('multi_button_settings', {}).get('debounce_time', 0.3) }}" 
+                           step="0.1" min="0.1" max="1">
+                    <span>seconds</span>
+                </div>
+                <div class="button-config">
+                    <label for="globalPollInterval">Poll Interval:</label>
+                    <input type="number" id="globalPollInterval" 
+                           value="{{ config.get('multi_button_settings', {}).get('poll_interval', 0.01) }}" 
+                           step="0.001" min="0.001" max="0.1">
+                    <span>seconds</span>
+                </div>
+                
+                <button onclick="saveMultiButtonSettings()">Save Button Configuration</button>
             </div>
-            <div class="relay-config">
-                <label for="buttonRelay">Button Controls Relay:</label>
-                <input type="number" id="buttonRelay" value="{{ config.button_settings.relay_number }}" min="1" max="8">
-                <span></span>
+            
+            <!-- Legacy single button config (hidden when multi-button is enabled) -->
+            <div id="singleButtonConfig" style="display: {% if not config.get('multi_button_settings', {}).get('enabled', False) %}block{% else %}none{% endif %};">
+                <h3>Single Button Mode</h3>
+                <div class="checkbox-label">
+                    <input type="checkbox" id="buttonEnabled"
+                           {% if config.button_settings.enabled %}checked{% endif %}>
+                    <label for="buttonEnabled">Enable Physical Button</label>
+                </div>
+                <div class="relay-config">
+                    <label for="buttonPin">Button GPIO Pin:</label>
+                    <input type="number" id="buttonPin" value="{{ config.button_settings.button_pin }}">
+                    <span></span>
+                </div>
+                <div class="relay-config">
+                    <label for="buttonRelay">Button Controls Relay:</label>
+                    <input type="number" id="buttonRelay" value="{{ config.button_settings.relay_number }}" min="1" max="8">
+                    <span></span>
+                </div>
+                <div class="relay-config">
+                    <label for="debounceTime">Debounce Time:</label>
+                    <input type="number" id="debounceTime" value="{{ config.button_settings.debounce_time }}" step="0.1" min="0.1" max="1">
+                    <span>seconds</span>
+                </div>
+                <button onclick="saveButtonSettings()">Save Button Settings</button>
             </div>
-            <div class="relay-config">
-                <label for="debounceTime">Debounce Time:</label>
-                <input type="number" id="debounceTime" value="{{ config.button_settings.debounce_time }}" step="0.1" min="0.1" max="1">
-                <span>seconds</span>
-            </div>
-            <button onclick="saveButtonSettings()">Save Button Settings</button>
         </div>
+        
         <div class="section">
             <h2>Audio Button Settings</h2>
             <div class="checkbox-label">
@@ -360,6 +490,19 @@
         </div>
     </div>
     <script>
+        // Toggle between single and multi button modes
+        document.getElementById('multiButtonEnabled').addEventListener('change', function(e) {
+            document.getElementById('multiButtonConfig').style.display = e.target.checked ? 'block' : 'none';
+            document.getElementById('singleButtonConfig').style.display = e.target.checked ? 'none' : 'block';
+        });
+        
+        // Update button card styling based on enabled state
+        for (let i = 1; i <= 8; i++) {
+            document.getElementById(`buttonEnabled${i}`).addEventListener('change', function(e) {
+                document.getElementById(`buttonCard${i}`).classList.toggle('disabled', !e.target.checked);
+            });
+        }
+        
         function saveRelayNames() {
             const names = {};
             for (let i = 1; i <= 8; i++) {
@@ -382,6 +525,7 @@
                 console.error(error);
             });
         }
+        
         function saveDurations() {
             const durations = {};
             for (let i = 1; i <= 8; i++) {
@@ -404,6 +548,46 @@
                 console.error(error);
             });
         }
+        
+        function saveMultiButtonSettings() {
+            const buttons = {};
+            for (let i = 1; i <= 8; i++) {
+                const pinValue = document.getElementById(`buttonPin${i}`).value;
+                if (pinValue) {
+                    buttons[i.toString()] = {
+                        pin: parseInt(pinValue),
+                        relay: i,
+                        enabled: document.getElementById(`buttonEnabled${i}`).checked
+                    };
+                }
+            }
+            
+            const settings = {
+                enabled: document.getElementById('multiButtonEnabled').checked,
+                buttons: buttons,
+                pull_up: true,
+                debounce_time: parseFloat(document.getElementById('globalDebounce').value) || 0.3,
+                poll_interval: parseFloat(document.getElementById('globalPollInterval').value) || 0.01
+            };
+            
+            fetch('/admin/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    section: 'multi_button_settings',
+                    settings: settings
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showStatus(data.status === 'success' ? 'Button configuration saved! Restart service to apply.' : 'Error saving settings', data.status);
+            })
+            .catch(error => {
+                showStatus('Error saving button configuration', 'error');
+                console.error(error);
+            });
+        }
+        
         function saveButtonSettings() {
             const settings = {
                 enabled: document.getElementById('buttonEnabled').checked,
@@ -428,6 +612,7 @@
                 console.error(error);
             });
         }
+        
         function saveAudioSettings() {
             const settings = {
                 enabled: document.getElementById('audioEnabled').checked,
@@ -465,6 +650,7 @@
                 console.error(error);
             });
         }
+        
         function testRelay(relayNum) {
             const button = event.target;
             button.disabled = true;
@@ -491,6 +677,7 @@
                 console.error(error);
             });
         }
+        
         function testAudio(buttonNum) {
             const button = event.target;
             button.disabled = true;
@@ -517,6 +704,7 @@
                 console.error(error);
             });
         }
+        
         function showStatus(message, type) {
             const statusDiv = document.getElementById('configStatus');
             statusDiv.className = type;
@@ -526,6 +714,7 @@
                 statusDiv.style.display = 'none';
             }, 3000);
         }
+        
         function refreshLogs() {
             fetch('/admin/logs')
                 .then(response => response.json())
@@ -538,6 +727,7 @@
                     console.error('Error fetching logs:', error);
                 });
         }
+        
         function updateStats() {
             fetch('/admin/stats')
                 .then(response => response.json())
@@ -546,11 +736,13 @@
                     document.getElementById('totalTriggersValue').textContent = data.total_triggers;
                     document.getElementById('audioPlaysValue').textContent = data.audio_plays;
                     document.getElementById('errorsValue').textContent = data.errors;
+                    document.getElementById('buttonCountValue').textContent = data.physical_buttons_active || 0;
                 })
                 .catch(error => {
                     console.error('Error fetching stats:', error);
                 });
         }
+        
         setInterval(refreshLogs, 10000);
         setInterval(updateStats, 5000);
         window.addEventListener('load', () => {
